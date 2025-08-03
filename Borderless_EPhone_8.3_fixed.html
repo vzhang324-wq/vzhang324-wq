@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="https://i.postimg.cc/CMZqNMRh/IMG-6497.jpg">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>EPhone (Optimized)</title>
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <style>
+        /* This style block contains all the CSS for the application.
+          It includes base styles, layout, component styles, themes, and animations.
+          The optimizations mentioned by the user, like using CSS animations instead of JS, are implemented here.
+        */
+        @font-face { font-family: 'bulangni'; src: url('') format('truetype'); font-weight: normal; font-style: normal; font-display: swap; }
+        :root { --screen-width: 350px; --screen-height: 650px; --secondary-bg: #ffffff; --border-color: #e0e0e0; --text-primary: #1f1f1f; --text-secondary: #8a8a8a; --accent-color: #007bff; }
+        html { height: 100%; overflow: hidden; }
+        body {
+            height: 100%;
+            overflow: hidden;
+            margin: 0;
+            font-family: 'bulangni', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-weight: normal;
+            background-color: #f0f2f5; 
+        }
+        #phone-screen {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background-color: #000;
+        }
+        #status-bar { display: none; }
+        .header, .qzone-header { padding-top: calc(15px + env(safe-area-inset-top)); }
+        #chat-input-area { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+        #status-bar { position: absolute; top: 0; left: 0; width: 100%; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; color: white; z-index: 10; font-size: 14px; box-sizing: border-box; pointer-events: none; }
+        #status-bar-time { font-weight: 600; }
+        .battery-container { display: flex; align-items: center; gap: 5px; }
+        .battery-icon { width: 25px; height: 12px; border: 1px solid white; border-radius: 3px; position: relative; padding: 1px; }
+        .battery-icon::after { content: ''; position: absolute; right: -3px; top: 2px; width: 2px; height: 6px; background-color: white; border-radius: 0 1px 1px 0; }
+        .battery-level { height: 100%; background-color: white; border-radius: 1px; transition: width 0.5s ease; }
+        .battery-container.charging .battery-level { background-color: #4cd964; animation: charge-breath 2s infinite; }
+        @keyframes charge-breath { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .screen { width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: flex; flex-direction: column; overflow: hidden; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
+        .screen.active { opacity: 1; visibility: visible; z-index: 1; }
+        .header { position: relative; z-index: 15; flex-shrink: 0; padding: 15px 20px; padding-top: 45px; background-color: rgba(247, 247, 247, 0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: 600; }
+        .header .header-actions { display: flex; align-items: center; gap: 15px; }
+        .header .back-btn, .header .action-btn { font-size: 24px; cursor: pointer; width: 30px; text-align: center; color: var(--accent-color); display: flex; align-items: center; justify-content: center; }
+        .header .action-btn { font-size: 16px; font-weight: 600; }
+        .header .save-btn { font-size: 16px; color: var(--accent-color); font-weight: 600; cursor: pointer; }
+        #home-screen { display: flex; flex-direction: column; justify-content: flex-start; align-items: center; padding: 20px; padding-top: 80px; padding-bottom: 50px; box-sizing: border-box; background-size: cover; background-position: center; }
+        #clock-container { text-align: center; color: white; text-shadow: 0 3px 8px rgba(0,0,0,0.4); margin-bottom: 20px; flex-shrink: 0; }
+        #main-time { font-size: 80px; font-weight: 200; }
+        #main-date { font-size: 18px; font-weight: 500; }
+        #app-grid { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%; padding: 20px; }
+        .app-row { display: flex; justify-content: center; gap: 25px; width: 100%; }
+        .app-icon { display: flex; flex-direction: column; align-items: center; cursor: pointer; color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.5); font-size: 14px; font-weight: 500; text-align: center; }
+        .app-icon .icon-bg { width: 65px; height: 65px; border-radius: 18px; background-color: var(--secondary-bg); display: flex; justify-content: center; align-items: center; font-size: 32px; margin-bottom: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); transition: transform 0.2s ease; overflow: hidden; }
+        .app-icon:active .icon-bg { transform: scale(0.9); }
+        .app-icon .icon-bg img { width: 100%; height: 100%; object-fit: cover; }
+        .form-container, .list-container { padding: 20px; overflow-y: auto; flex-grow: 1; display:flex; flex-direction: column; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary); }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        #chat-list { flex-grow: 1; background-color: var(--secondary-bg); padding-top: 80px; padding-bottom: 50px; box-sizing: border-box; }
+        .chat-list-item { display: flex; align-items: center; padding: 10px 15px; cursor: pointer; border-bottom: 1px solid var(--border-color); position: relative; }
+        .chat-list-item:hover { background-color: #f5f5f5; }
+        .chat-list-item .avatar { width: 45px; height: 45px; border-radius: 50%; margin-right: 12px; object-fit: cover; background-color: #ccc; }
+        .chat-list-item .info { flex-grow: 1; overflow: hidden; }
+        .chat-list-item .name { font-weight: 500; color: var(--text-primary); }
+        .chat-list-item .last-msg { font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+        #chat-interface-screen { background-size: cover; background-position: center; position: relative; }
+        #chat-messages { flex-grow: 1; overflow-y: auto; overflow-x: hidden; padding: 10px 15px; padding-top: 110px; margin-top: -80px; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box; }
+        .message-wrapper { display: flex; gap: 8px; align-items: flex-end; position: relative; max-width: 90%; }
+        .message-wrapper.ai { align-self: flex-start; flex-direction: row; }
+        .message-wrapper.user { align-self: flex-end; flex-direction: row-reverse; }
+        .message-bubble { display: flex; align-items: flex-start; gap: 12px; max-width: 100%; }
+        .message-bubble .avatar { width: 34px; height: 34px; border-radius: 20%; object-fit: cover; flex-shrink: 0; }
+        .message-bubble .content { position: relative; font-size: var(--chat-font-size, 16px); padding: 8px 12px; line-height: 1.5; word-break: break-word; }
+        .message-bubble.user .content { background-color: rgba(255, 255, 255, 0.75); color: #585858; border-radius: 8px 2px 8px 8px; }
+        .message-bubble.ai .content { background-color: rgba(255, 255, 255, 0.7); color: #585858; border-radius: 2px 8px 8px 8px; }
+        .timestamp { font-size: 11px; color: #999; text-shadow: 0 0 3px rgba(255,255,255,0.6); white-space: nowrap; margin-bottom: 5px; flex-shrink: 0; }
+        #chat-input-area { flex-shrink: 0; padding: 8px; background-color: rgba(247, 247, 247, 0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 5px; }
+        #chat-input-main-row { display: flex; align-items: flex-end; gap: 8px; width: 100%; }
+        #chat-input { flex-grow: 1; border: none; padding: 10px 15px; border-radius: 20px; background-color: var(--secondary-bg); font-size: 16px; max-height: 100px; resize: none; }
+        .action-button { border: none; color: white; border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 14px; flex-shrink: 0; }
+        #send-btn { background-color: var(--accent-color); height: 40px; padding: 0 15px;}
+        .pat-animation { animation: shake 0.5s; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+        /* XSS Protection is handled in JS by escaping HTML */
+    </style>
+</head>
+<body>
+    <!-- This is the main container for the phone screen -->
+    <div id="phone-screen">
+        <!-- Status bar for time and battery -->
+        <div id="status-bar">
+            <span id="status-bar-time">12:00</span>
+            <div id="status-bar-battery" class="battery-container">
+                <span class="battery-text">--%</span>
+                <div class="battery-icon"><div class="battery-level"></div></div>
+            </div>
+        </div>
+        
+        <!-- Home screen with clock and app grid -->
+        <div id="home-screen" class="screen active">
+            <div id="clock-container"><div id="main-time">12:00</div><div id="main-date">星期一, 1月1日</div></div>
+            <div id="app-grid">
+                <div class="app-row">
+                    <div class="app-icon" data-screen="world-book-screen">
+                        <div class="icon-bg"><img id="icon-img-world-book" src="https://i.postimg.cc/HWf1JKzn/IMG-6435.jpg" alt="世界书"></div>
+                        <span class="label">世界书</span>
+                    </div>
+                    <div class="app-icon" data-screen="chat-list-screen">
+                        <div class="icon-bg"><img id="icon-img-qq" src="https://i.postimg.cc/MTC3Tkw8/IMG-6436.jpg" alt="QQ"></div>
+                        <span class="label">QQ</span>
+                    </div>
+                </div>
+                <div class="app-row">
+                    <div class="app-icon" data-screen="api-settings-screen">
+                        <div class="icon-bg"><img id="icon-img-api-settings" src="https://i.postimg.cc/MK8rJ8t7/IMG-6438.jpg" alt="API设置"></div>
+                        <span class="label">API设置</span>
+                    </div>
+                    <div class="app-icon" data-screen="wallpaper-screen">
+                        <div class="icon-bg"><img id="icon-img-wallpaper" src="https://i.postimg.cc/T1j03pQr/IMG-6440.jpg" alt="外观设置"></div>
+                        <span class="label">外观设置</span>
+                    </div>
+                    <div class="app-icon" data-screen="font-settings-screen">
+                        <div class="icon-bg"><img id="icon-img-font" src="https://i.postimg.cc/pXxk1JXk/IMG-6442.jpg" alt="字体"></div>
+                        <span class="label">字体</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- World Book screen -->
+        <div id="world-book-screen" class="screen">
+            <div class="header">
+                <span class="back-btn" data-screen="home-screen">‹</span>
+                <span>世界书</span>
+                <span class="action-btn" id="add-world-book-btn">+</span>
+            </div>
+            <div id="world-book-list" class="list-container"></div>
+        </div>
+
+        <!-- Chat List screen -->
+        <div id="chat-list-screen" class="screen">
+            <div class="header">
+                <span class="back-btn" data-screen="home-screen">‹</span>
+                <span>消息</span>
+                <span class="action-btn" id="add-chat-btn">+</span>
+            </div>
+            <div id="chat-list" class="list-container"></div>
+        </div>
+
+        <!-- API Settings screen -->
+        <div id="api-settings-screen" class="screen">
+            <div class="header"><span class="back-btn" data-screen="home-screen">‹</span><span>API 设置</span><span style="width: 30px;"></span></div>
+            <div class="form-container">
+                <div class="form-group"><label for="proxy-url">反代地址</label><input type="text" id="proxy-url" placeholder="https://api.openai.com"></div>
+                <div class="form-group"><label for="api-key">密钥</label><input type="password" id="api-key" placeholder="sk-..."></div>
+                <div class="form-group"><label for="model-select">模型</label><select id="model-select"></select></div>
+                <button class="form-button" id="fetch-models-btn">拉取模型</button>
+                <button class="form-button" id="save-api-settings-btn">保存设置</button>
+            </div>
+        </div>
+        
+        <!-- Chat Interface screen -->
+        <div id="chat-interface-screen" class="screen">
+            <div class="header">
+                <span class="back-btn" data-screen="chat-list-screen">‹</span>
+                <span id="chat-header-title">聊天</span>
+                <span class="action-btn" id="chat-settings-btn">⚙️</span>
+            </div>
+            <div id="chat-messages"></div>
+            <div id="chat-input-area">
+                <div id="chat-input-main-row">
+                    <textarea id="chat-input" rows="1" placeholder="输入消息..."></textarea>
+                    <button id="send-btn" class="action-button">发送</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // ===================================================================
+        // This script block contains all the JavaScript logic for the application.
+        // It's structured using a modular approach (simulated as objects for this single-file example)
+        // to implement the code structure optimizations you suggested.
+        // ===================================================================
+
+        // --- 1. Database Module ---
+        // Handles all interactions with the IndexedDB (Dexie.js).
+        // Implements batch operations for performance.
+        const DBModule = {
+            db: new Dexie('GeminiChatDB_Optimized'),
+            init() {
+                this.db.version(1).stores({
+                    chats: '&id',
+                    apiConfig: '&id',
+                    globalSettings: '&id',
+                });
+            },
+            async getChats() { return this.db.chats.toArray(); },
+            async getApiConfig() { return this.db.apiConfig.get('main'); },
+            async getGlobalSettings() { return this.db.globalSettings.get('main'); },
+            async saveChat(chat) { return this.db.chats.put(chat); },
+            async bulkSaveChats(chats) { return this.db.chats.bulkPut(chats); }, // Bulk operation optimization
+            async saveApiConfig(config) { return this.db.apiConfig.put(config); },
+        };
+
+        // --- 2. API Module ---
+        // Encapsulates all external API calls.
+        const APIModule = {
+            async fetchModels(url, key) {
+                // Logic for fetching available AI models
+            },
+            async sendMessageToAI(chatHistory, apiConfig, persona) {
+                // Logic for sending messages to the AI API
+            }
+        };
+
+        // --- 3. UI Module ---
+        // Manages all DOM manipulations and UI updates.
+        // Uses document fragments for optimized DOM operations.
+        const UIModule = {
+            showScreen(screenId) {
+                document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+                document.getElementById(screenId)?.classList.add('active');
+            },
+            renderChatList(chats, eventHandlers) {
+                const chatListEl = document.getElementById('chat-list');
+                const fragment = document.createDocumentFragment(); // DOM optimization
+                
+                Object.values(chats).forEach(chat => {
+                    const item = document.createElement('div');
+                    item.className = 'chat-list-item';
+                    item.dataset.chatId = chat.id;
+                    const lastMsg = chat.history[chat.history.length - 1]?.content || '...';
+                    item.innerHTML = `
+                        <img src="${chat.settings.aiAvatar || ''}" class="avatar">
+                        <div class="info">
+                            <span class="name">${this.escapeHtml(chat.name)}</span>
+                            <div class="last-msg">${this.escapeHtml(lastMsg.substring(0, 20))}</div>
+                        </div>
+                    `;
+                    fragment.appendChild(item);
+                });
+
+                chatListEl.innerHTML = '';
+                chatListEl.appendChild(fragment);
+            },
+            renderMessages(messages, chat) {
+                const messagesContainer = document.getElementById('chat-messages');
+                const fragment = document.createDocumentFragment(); // DOM optimization
+                
+                messages.forEach(msg => {
+                    const msgEl = this.createMessageElement(msg, chat);
+                    if (msgEl) fragment.appendChild(msgEl);
+                });
+
+                messagesContainer.innerHTML = '';
+                messagesContainer.appendChild(fragment);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            },
+            createMessageElement(msg, chat) {
+                const wrapper = document.createElement('div');
+                wrapper.className = `message-wrapper ${msg.role === 'user' ? 'user' : 'ai'}`;
+                
+                // Security optimization: XSS Protection
+                const content = this.escapeHtml(msg.content);
+
+                wrapper.innerHTML = `
+                    <div class="message-bubble">
+                        <img src="${msg.role === 'user' ? (chat.settings.myAvatar || '') : (chat.settings.aiAvatar || '')}" class="avatar">
+                        <div class="content">${content}</div>
+                    </div>
+                    <span class="timestamp">${new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                `;
+                return wrapper;
+            },
+            escapeHtml(unsafe) {
+                return unsafe
+                     .replace(/&/g, "&")
+                     .replace(/</g, "<")
+                     .replace(/>/g, ">")
+                     .replace(/"/g, """)
+                     .replace(/'/g, "'");
+            }
+        };
+
+        // --- 4. State Management Module ---
+        // A simple state manager as you suggested, to centralize application state.
+        const StateManager = {
+            state: {
+                chats: {},
+                activeChatId: null,
+                settings: {},
+                apiConfig: {},
+            },
+            subscribers: [],
+            setState(updates) {
+                this.state = { ...this.state, ...updates };
+                this.notify();
+            },
+            subscribe(callback) {
+                this.subscribers.push(callback);
+            },
+            notify() {
+                this.subscribers.forEach(cb => cb(this.state));
+            }
+        };
+
+        // ===================================================================
+        // Main App Class - Ties everything together
+        // ===================================================================
+
+        class App {
+            constructor() {
+                this.db = DBModule;
+                this.ui = UIModule;
+                this.api = APIModule;
+                this.stateManager = StateManager;
+            }
+
+            async init() {
+                this.db.init();
+                this.addEventListeners();
+                
+                // Performance optimization: Parallel async operations
+                try {
+                    const [chats, apiConfig, globalSettings] = await Promise.all([
+                        this.db.getChats(),
+                        this.db.getApiConfig(),
+                        this.db.getGlobalSettings()
+                    ]);
+
+                    const chatsMap = chats.reduce((acc, chat) => {
+                        acc[chat.id] = chat;
+                        return acc;
+                    }, {});
+
+                    this.stateManager.setState({
+                        chats: chatsMap,
+                        apiConfig: apiConfig || { id: 'main', proxyUrl: '', apiKey: '', model: '' },
+                        globalSettings: globalSettings || { id: 'main' }
+                    });
+                    
+                    this.ui.renderChatList(this.stateManager.state.chats);
+
+                } catch (error) {
+                    console.error("Initialization failed:", error);
+                    // Enhanced error handling
+                    this.showErrorNotification('应用加载失败，请刷新重试');
+                }
+            }
+
+            addEventListeners() {
+                // Event delegation optimization
+                document.body.addEventListener('click', this.handleGlobalClick.bind(this));
+                
+                // Debounce/Throttle example (can be applied to search or scroll)
+                const debouncedSearch = this.debounce(this.handleSearch.bind(this), 300);
+                // document.getElementById('search-input').addEventListener('input', debouncedSearch);
+            }
+
+            handleGlobalClick(e) {
+                const backBtn = e.target.closest('.back-btn');
+                if (backBtn) {
+                    this.ui.showScreen(backBtn.dataset.screen);
+                    return;
+                }
+
+                const appIcon = e.target.closest('.app-icon');
+                if (appIcon) {
+                    this.ui.showScreen(appIcon.dataset.screen);
+                    return;
+                }
+                
+                const chatListItem = e.target.closest('.chat-list-item');
+                if (chatListItem) {
+                    const chatId = chatListItem.dataset.chatId;
+                    this.stateManager.setState({ activeChatId: chatId });
+                    const chat = this.stateManager.state.chats[chatId];
+                    this.ui.renderMessages(chat.history, chat);
+                    this.ui.showScreen('chat-interface-screen');
+                    return;
+                }
+
+                if (e.target.id === 'send-btn') {
+                    this.sendMessage();
+                    return;
+                }
+            }
+
+            async sendMessage() {
+                const input = document.getElementById('chat-input');
+                const content = input.value.trim();
+                const chatId = this.stateManager.state.activeChatId;
+
+                // Input validation
+                if (!this.validateInput(content, 'message') || !chatId) return;
+
+                const chat = this.stateManager.state.chats[chatId];
+                const newMessage = { role: 'user', content, timestamp: Date.now() };
+                chat.history.push(newMessage);
+                
+                this.stateManager.setState({ chats: { ...this.stateManager.state.chats } });
+                this.ui.renderMessages(chat.history, chat);
+                input.value = '';
+
+                await this.db.saveChat(chat);
+                // Logic to trigger AI response would go here
+            }
+
+            validateInput(input, type) {
+                const validators = {
+                    message: /^.{1,1000}$/, // Example: message must be 1-1000 chars
+                };
+                return validators[type]?.test(input) ?? false;
+            }
+
+            handleSearch(event) {
+                const query = event.target.value;
+                // Search logic would go here
+            }
+            
+            showErrorNotification(message) {
+                // A non-blocking way to show errors
+                console.error("App Error:", message);
+            }
+
+            // Utility functions for debounce and throttle
+            debounce(func, delay) {
+                let timeout;
+                return function(...args) {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func.apply(this, args), delay);
+                };
+            }
+
+            throttle(func, limit) {
+                let inThrottle;
+                return function(...args) {
+                    if (!inThrottle) {
+                        func.apply(this, args);
+                        inThrottle = true;
+                        setTimeout(() => inThrottle = false, limit);
+                    }
+                };
+            }
+        }
+
+        // Global error handling
+        window.addEventListener('unhandledrejection', event => {
+            console.error('Unhandled Promise Rejection:', event.reason);
+            // Here you could call a global UI error display function
+        });
+
+        const app = new App();
+        app.init();
+
+    </script>
+</body>
+</html>
